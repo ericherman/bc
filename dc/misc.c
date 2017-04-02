@@ -1,11 +1,12 @@
 /* 
  * misc. functions for the "dc" Desk Calculator language.
  *
- * Copyright (C) 1994, 1997, 1998, 2000 Free Software Foundation, Inc.
+ * Copyright (C) 1994, 1997, 1998, 2000, 2006, 2008, 2013
+ * Free Software Foundation, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
+ * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
  *
  * This program is distributed in the hope that it will be useful,
@@ -14,17 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, you can either send email to this
- * program's author (see below) or write to:
- *   The Free Software Foundation, Inc.
- *   59 Temple Place, Suite 330
- *   Boston, MA 02111 USA
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
  */
 
-/* This module contains miscelaneous functions that have no
+/* This module contains miscellaneous functions that have no
  * special knowledge of any private data structures.
- * They could all be moved to their own separate modules, but
- * are agglomerated here for convenience.
+ * They could each be moved to their own separate modules,
+ * but are aggregated here as a matter of convenience.
  */
 
 #include "config.h"
@@ -70,7 +68,7 @@ dc_malloc DC_DECLARG((len))
 {
 	void *result = malloc(len);
 
-	if (!result)
+	if (result == NULL)
 		dc_memfail();
 	return result;
 }
@@ -88,9 +86,9 @@ dc_show_id DC_DECLARG((fp, id, suffix))
 	const char *suffix DC_DECLEND
 {
 	if (isgraph(id))
-		fprintf(fp, "'%c' (%#o)%s", id, id, suffix);
+		fprintf(fp, "'%c' (%#o)%s", (unsigned int) id, id, suffix);
 	else
-		fprintf(fp, "%#o%s", id, suffix);
+		fprintf(fp, "%#o%s", (unsigned int) id, suffix);
 }
 
 
@@ -134,8 +132,8 @@ dc_system DC_DECLARG((s))
 	size_t len;
 
 	p = strchr(s, '\n');
-	if (p) {
-		len = p - s;
+	if (p != NULL) {
+		len = (size_t) (p - s);
 		tmpstr = dc_malloc(len + 1);
 		strncpy(tmpstr, s, len);
 		tmpstr[len] = '\0';
@@ -157,12 +155,15 @@ dc_print DC_DECLARG((value, obase, newline_p, discard_p))
 	dc_discard discard_p DC_DECLEND
 {
 	if (value.dc_type == DC_NUMBER) {
-		dc_out_num(value.v.number, obase, newline_p, discard_p);
+		dc_out_num(value.v.number, obase, discard_p);
 	} else if (value.dc_type == DC_STRING) {
-		dc_out_str(value.v.string, newline_p, discard_p);
+		dc_out_str(value.v.string, discard_p);
 	} else {
 		dc_garbage("in data being printed", -1);
 	}
+	if (newline_p == DC_WITHNL)
+		putchar ('\n');
+	fflush(stdout);
 }
 
 /* return a duplicate of the passed value, regardless of type */
@@ -177,3 +178,12 @@ dc_dup DC_DECLARG((value))
 	/*else*/
 	return dc_dup_str(value.v.string);
 }
+
+
+/*
+ * Local Variables:
+ * mode: C
+ * tab-width: 4
+ * End:
+ * vi: set ts=4 :
+ */

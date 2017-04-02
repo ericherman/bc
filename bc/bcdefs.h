@@ -1,11 +1,10 @@
-/* bcdefs.h:  The single file to include all constants and type definitions. */
-
 /*  This file is part of GNU bc.
-    Copyright (C) 1991, 1992, 1993, 1994, 1997 Free Software Foundation, Inc.
+
+    Copyright (C) 1991-1994, 1997, 2006, 2008, 2012-2017 Free Software Foundation, Inc.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License , or
+    the Free Software Foundation; either version 3 of the License , or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
@@ -14,10 +13,8 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program; see the file COPYING.  If not, write to
-      The Free Software Foundation, Inc.
-      59 Temple Place, Suite 330
-      Boston, MA 02111 USA
+    along with this program; see the file COPYING.  If not, see
+    <http://www.gnu.org/licenses>.
 
     You may contact the author by:
        e-mail:  philnelson@acm.org
@@ -28,6 +25,8 @@
        
 *************************************************************************/
 
+/* bcdefs.h:  The single file to include all constants and type definitions. */
+
 /* Include the configuration file. */
 #include "config.h"
 
@@ -35,10 +34,10 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <ctype.h>
-#ifdef HAVE_STRINGS_H
-#include <strings.h>
-#else
+#ifdef HAVE_STRING_H
 #include <string.h>
+#else
+#include <strings.h>
 #endif
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
@@ -51,6 +50,15 @@
 #if defined(READLINE)
 #include <readline/readline.h>
 #include <readline/history.h>
+#endif
+
+/* Initialization magic ... */
+#ifdef _GLOBAL_C
+#define EXTERN 
+#define INIT(x) = x
+#else
+#define EXTERN extern
+#define INIT(x)
 #endif
 
 /* Include the other definitions. */
@@ -70,7 +78,7 @@
 
 typedef struct bc_label_group
     {
-      long l_adrs [ BC_LABEL_GROUP ];
+      unsigned long l_adrs [ BC_LABEL_GROUP ];
       struct bc_label_group *l_next;
     } bc_label_group;
 
@@ -90,9 +98,10 @@ typedef struct arg_list
 typedef struct 
     {
       char f_defined;   /* Is this function defined yet. */
+      char f_void;	/* Is this function a void function. */
       char *f_body;
-      int  f_body_size;  /* Size of body.  Power of 2. */
-      int  f_code_size;
+      size_t f_body_size;  /* Size of body.  Power of 2. */
+      size_t f_code_size;
       bc_label_group *f_label;
       arg_list *f_params;
       arg_list *f_autos;
@@ -100,8 +109,8 @@ typedef struct
 
 /* Code addresses. */
 typedef struct {
-      int pc_func;
-      int pc_addr;
+      unsigned int pc_func;
+      unsigned int pc_addr;
     } program_counter;
 
 
@@ -186,3 +195,6 @@ typedef struct file_node {
 #define HISTORY_SIZE(n) stifle_history(n)
 #define UNLIMIT_HISTORY unstifle_history()
 #endif
+
+/* Now the global variable declarations. */
+#include "global.h"

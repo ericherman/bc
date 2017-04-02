@@ -1,11 +1,10 @@
-/* load.c:  This code "loads" code into the code segments. */
-
 /*  This file is part of GNU bc.
-    Copyright (C) 1991-1994, 1997, 2000 Free Software Foundation, Inc.
+
+    Copyright (C) 1991-1994, 1997, 2006, 2008, 2012-2017 Free Software Foundation, Inc.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License , or
+    the Free Software Foundation; either version 3 of the License , or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
@@ -14,10 +13,8 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program; see the file COPYING.  If not, write to
-      The Free Software Foundation, Inc.
-      59 Temple Place, Suite 330
-      Boston, MA 02111 USA
+    along with this program; see the file COPYING.  If not, see
+    <http://www.gnu.org/licenses>.
 
     You may contact the author by:
        e-mail:  philnelson@acm.org
@@ -28,8 +25,9 @@
        
 *************************************************************************/
 
+/* load.c:  This code "loads" code into the code segments. */
+
 #include "bcdefs.h"
-#include "global.h"
 #include "proto.h"
 
 /* Load variables. */
@@ -40,7 +38,7 @@ char load_const;
 
 /* Initialize the load sequence. */
 void
-init_load ()
+init_load (void)
 {
   clear_func(0);
   load_adr.pc_func = 0;
@@ -51,10 +49,9 @@ init_load ()
 
 /* addbyte adds one BYTE to the current code segment. */
 void
-addbyte (byte)
-     char byte;
+addbyte (unsigned char thebyte)
 {
-  int pc;
+  unsigned long prog_addr;
   bc_function *f;
   char *new_body;
 
@@ -62,20 +59,20 @@ addbyte (byte)
   if (had_error) return;
 
   /* Calculate the segment and offset. */
-  pc = load_adr.pc_addr++;
+  prog_addr = load_adr.pc_addr++;
   f = &functions[load_adr.pc_func];
 
-  if (pc >= f->f_body_size)
+  if (prog_addr >= f->f_body_size)
     {
       f->f_body_size *= 2;
-      new_body = (char *) bc_malloc (f->f_body_size);
+      new_body = bc_malloc (f->f_body_size);
       memcpy(new_body, f->f_body, f->f_body_size/2);
       free (f->f_body);
       f->f_body = new_body;
     }
 
-  /* Store the byte. */
-  f->f_body[pc] = byte;
+  /* Store the thebyte. */
+  f->f_body[prog_addr] = (char) (thebyte & 0xff);
   f->f_code_size++;
 }
 
@@ -83,11 +80,10 @@ addbyte (byte)
 /* Define a label LAB to be the current program counter. */
 
 void
-def_label (lab)
-     long lab;
+def_label (unsigned long lab)
 {
   bc_label_group *temp;
-  int group, offset, func;
+  unsigned long group, offset, func;
     
   /* Get things ready. */
   group = lab >> BC_LABEL_LOG;
@@ -97,8 +93,7 @@ def_label (lab)
   /* Make sure there is at least one label group. */
   if (functions[func].f_label == NULL)
     {
-      functions[func].f_label = 
-	(bc_label_group *) bc_malloc (sizeof(bc_label_group));
+      functions[func].f_label = bc_malloc (sizeof(bc_label_group));
       functions[func].f_label->l_next = NULL;
     }
 
@@ -108,7 +103,7 @@ def_label (lab)
     {
       if (temp->l_next == NULL)
 	{
-	  temp->l_next = (bc_label_group *) bc_malloc (sizeof(bc_label_group));
+	  temp->l_next = bc_malloc (sizeof(bc_label_group));
 	  temp->l_next->l_next = NULL;
 	}
       temp = temp->l_next;
@@ -125,8 +120,7 @@ def_label (lab)
    must be moved to the last non-digit character. */
 
 long
-long_val (str)
-     char **str;
+long_val (const char **str)
 { int  val = 0;
   char neg = FALSE;
 
@@ -148,15 +142,14 @@ long_val (str)
 /* load_code loads the CODE into the machine. */
 
 void
-load_code (code)
-     char *code;
+load_code (const char *code)
 {
-  char *str;
-  long  ap_name;	/* auto or parameter name. */
-  long  label_no;
-  long  vaf_name;	/* variable, array or function number. */
-  long  func;
-  program_counter save_adr;
+  const char *str;
+  unsigned long  ap_name;	/* auto or parameter name. */
+  unsigned long  label_no;
+  unsigned long  vaf_name;	/* variable, array or function number. */
+  unsigned long  func;
+  static program_counter save_adr;
 
   /* Initialize. */
   str = code;
@@ -188,10 +181,19 @@ load_code (code)
 		  if (*str == '.')
 		    addbyte (*str++);
 		  else
-		    if (*str >= 'A')
-		      addbyte (*str++ + 10 - 'A');
-		    else
-		      addbyte (*str++ - '0');
+                    {
+		      if (*str > 'F' && (warn_not_std || std_only))
+                        {
+                          if (std_only)
+                            yyerror ("Error in numeric constant");
+                          else
+                            ct_warn ("Non-standard base in numeric constant");
+                        } 
+		      if (*str >= 'A')
+		        addbyte (*str++ + 10 - 'A');
+		      else
+		        addbyte (*str++ - '0');
+                    }
 	      }
 	  }
 	else
@@ -217,7 +219,7 @@ load_code (code)
 		if (label_no > 65535L)
 		  {  /* Better message? */
 		    fprintf (stderr,"Program too big.\n");
-		    exit(1);
+		    bc_exit(1);
 		  }
 		addbyte ( (char) (label_no & 0xFF));
 		addbyte ( (char) (label_no >> 8));

@@ -4,11 +4,9 @@
 @settitle dc, an arbitrary precision calculator
 @c %**end of header
 
-@c This file has the new style title page commands.
-@c Run `makeinfo' rather than `texinfo-format-buffer'.
+@include texi-ver.incl
 
 @c smallbook
-
 @c tex
 @c \overfullrule=0pt
 @c end tex
@@ -20,74 +18,46 @@
 @syncodeindex pg fn
 @syncodeindex tp fn
 
-@ifinfo
 @direntry
-* dc: (dc).                   Arbritrary precision RPN ``Desktop Calculator''.
+* dc: (dc).                   Arbitrary precision RPN ``Desktop Calculator''.
 @end direntry
-This file documents @sc{dc}, an arbitrary precision calculator.
 
-Published by the Free Software Foundation, Inc.
-59 Temple Place, Suite 330
-Boston, MA 02111 USA
+@copying
+This manual documents version @value{DC_VERSION} of
+@sc{gnu} @command{dc}, an arbitrary precision calculator.
 
-Copyright (C) 1984, 1994, 1997, 1998, 2000 Free Software Foundation, Inc.
+Copyright (C) 1984, 1994, 1997, 1998, 2000, 2005, 2006, 2008, 2013, 2016
+Free Software Foundation, Inc.
 
-Permission is granted to make and distribute verbatim copies of
-this manual provided the copyright notice and this permission notice
-are preserved on all copies.
-
-@ignore
-Permission is granted to process this file through TeX and print the
-results, provided the printed document carries copying permission
-notice identical to this one except for the removal of this paragraph
-(this paragraph not being relevant to the printed manual).
-
-@end ignore
-Permission is granted to copy and distribute modified versions of this
-manual under the conditions for verbatim copying, provided that the entire
-resulting derived work is distributed under the terms of a permission
-notice identical to this one.
-
-Permission is granted to copy and distribute translations of this manual
-into another language, under the above conditions for modified versions,
-except that this permission notice may be stated in a translation approved
-by the Foundation.
-@end ifinfo
+@quotation
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the @sc{gnu} Free Documentation License,
+Version 1.2 or any later version published by the Free Software Foundation;
+with no Invariant Sections, with no Front-Cover Texts,
+and with no Back-Cover Texts.
+A copy of the license can be found at
+@url{http://www.gnu.org/licenses/fdl.html} .
+@end quotation
+@end copying
 
 @setchapternewpage off
 
 @titlepage
-@title dc, an arbitrary precision calculator
-
+@title @sc{gnu} @code{dc}
+@subtitle an arbitrary precision calculator
+@subtitle version @value{DC_VERSION}
 @author by Ken Pizzini
 @author original manual by Richard Stallman
 @page
 @vskip 0pt plus 1filll
-Copyright @copyright{} 1994, 1997, 1998 Free Software Foundation, Inc.
-
-@sp 2
-Published by the Free Software Foundation, @*
-59 Temple Place, Suite 330 @*
-Boston, MA 02111 USA
-
-Permission is granted to make and distribute verbatim copies of
-this manual provided the copyright notice and this permission notice
-are preserved on all copies.
-
-Permission is granted to copy and distribute modified versions of this
-manual under the conditions for verbatim copying, provided that the entire
-resulting derived work is distributed under the terms of a permission
-notice identical to this one.
-
-Permission is granted to copy and distribute translations of this manual
-into another language, under the above conditions for modified versions,
-except that this permission notice may be stated in a translation approved
-by the Foundation.
-
+@insertcopying
 @end titlepage
-@page
 
-@node Top, Introduction, (dir), (dir)
+@ifnottex
+@node Top
+@top GNU dc
+@insertcopying
+@end ifnottex
 
 @menu
 * Introduction::                Introduction
@@ -107,48 +77,51 @@ by the Foundation.
 @comment  node-name,  next,  previous,  up
 @chapter Introduction
 
-@sc{dc} is a reverse-polish desk calculator
+@command{dc} is a reverse-polish desk calculator
 which supports unlimited precision arithmetic.
 It also allows you to define and call macros.
-Normally @sc{dc} reads from the standard input;
+Normally @command{dc} reads from the standard input;
 if any command arguments are given to it, they are filenames,
-and @sc{dc} reads and executes the contents of the files
+and @command{dc} reads and executes the contents of the files
 instead of reading from standard input.
 All normal output is to standard output;
 all error messages are written to standard error.
 
 To exit, use @samp{q}.
-@kbd{C-c} does not exit;
+@kbd{C-c}
+(or whatever other keystroke your system uses to generate a @code{SIGINT})
+does not exit;
 it is used to abort macros that are looping, etc.
-(Currently this is not true; @kbd{C-c} does exit.)
 
 A reverse-polish calculator stores numbers on a stack.
 Entering a number pushes it on the stack.
 Arithmetic operations pop arguments off the stack and push the results.
 
-To enter a number in @sc{dc}, type the digits,
+To enter a number in @command{dc}, type the digits (using upper
+case letters @code{A} through @code{F} as "digits" when working
+with input bases greater than ten),
 with an optional decimal point.
 Exponential notation is not supported.
 To enter a negative number, begin the number with @samp{_}.
 @samp{-} cannot be used for this, as it is a binary operator
 for subtraction instead.
 To enter two numbers in succession,
-separate them with spaces or newlines.
-These have no meaning as commands.
+separate them with spaces or newlines;
+these have no meaning as commands.
 
 @node Invocation, Printing Commands, Introduction, Top
 @chapter Invocation
 
-@sc{dc} may be invoked with the following command-line options:
+@command{dc} may be invoked with the following command-line options:
 @table @samp
 
 @item -e @var{expr}
 @item --expression=@var{expr}
-Evaluate @var{expr} as @sc{dc} commands.
+Evaluate @var{expr} as @command{dc} commands.
 
 @item -f @var{file}
 @item --file=@var{file}
-Read and evaluate @sc{dc} commands from @var{file}.
+Read and evaluate @command{dc} commands from @var{file}.
 
 @item -h
 @item --help
@@ -178,7 +151,7 @@ A newline is printed after the value.
 @item n
 Prints the value on the top of the stack, popping it off,
 and does not print a newline after.
-(This command is a GNU extension.)
+(This command is a @sc{gnu} extension.)
 
 @item P
 Pops off the value on top of the stack.
@@ -188,10 +161,19 @@ value is printed out as a "base (UCHAR_MAX+1)" byte stream.
 Assuming that (UCHAR_MAX+1) is 256
 (as it is on most machines with 8-bit bytes),
 the sequence
-@code{KSK 0k1/ [_1*]sx d0>x [256~aPd0<x]dsxx sxLKk}
-could also accomplish this function,
-except for the side-effect of clobbering the x register.
-(Details of the behavior with a number are a GNU extension.)
+@code{KSK0k1/ _1Ss[ls*]Sxd0>x
+[256~Ssd0<x]dsxx
+sx[q]Sq[Lsd0>qaPlxx]dsxx
+sx0sqLqsxLxLK+k}
+could also accomplish this function.
+(Much of the complexity of the above native-dc code is due
+to the ~ computing the characters backwards,
+and the desire to ensure that all registers wind up back
+in their original states.)
+(Details of the behavior with a number are a @sc{gnu} extension.
+Traditional @command{dc} happened to "support" similar functionality
+for a limited range of inputs as an accidental side-effect of its
+internal representation of numbers.)
 
 @item f
 Prints the entire contents of the stack
@@ -200,6 +182,17 @@ without altering anything.
 This is a good command to use if you are lost or want
 to figure out what the effect of some command has been.
 @end table
+
+All numeric output is split to fit within 70 columns, by default.
+When a number is broken up in this way, the split is indicated
+by a "\" at the end of the to-be-continued output lines.
+The column width at which output is split can be overridden
+by setting the @var{DC_LINE_LENGTH} environment variable to
+the desired width.
+A @var{DC_LINE_LENGTH} of 0 (zero) disables the line-split
+feature altogether.
+Invalid values of @var{DC_LINE_LENGTH} are silently ignored.
+(The @var{DC_LINE_LENGTH} variable is a @sc{gnu} extension.)
 
 @node Arithmetic, Stack Control, Printing Commands, Top
 @chapter Arithmetic
@@ -244,7 +237,7 @@ The number of fraction digits used in the division
 is specified by the precision value.
 (The sequence @code{SdSn lnld/ LnLd%} could also accomplish
 this function, with slightly different error checking.)
-(This command is a GNU extension.)
+(This command is a @sc{gnu} extension.)
 
 @item ^
 Pops two values and exponentiates,
@@ -266,13 +259,14 @@ and any fractional part of this exponent will be ignored.
 The third value popped is the base which gets exponentiated,
 which should be an integer.
 For small integers this is like the sequence @code{Sm^Lm%},
-but, unlike @code{^}, this command will work with arbritrarily large exponents.
-(This command is a GNU extension.)
+but, unlike @code{^},
+this command will work with arbitrarily large exponents.
+(This command is a @sc{gnu} extension.)
 
 @item v
 Pops one value, computes its square root, and pushes that.
-The precision value specifies the number of fraction digits
-in the result.
+The maximum of the precision value and the precision of the argument
+is used to determine the number of fraction digits in the result.
 @end table
 
 Most arithmetic operations are affected by the @emph{precision value},
@@ -295,13 +289,31 @@ Thus, @samp{4d*p} computes 4 squared and prints it.
 
 @item r
 Reverses the order of (swaps) the top two values on the stack.
-(This command is a GNU extension.)
+(This can also be accomplished with the sequence @code{SaSbLaLb}.)
+(This command is a @sc{gnu} extension.)
+
+@item R
+Pops the top-of-stack as an integer @var{n}.
+Cyclically rotates the top @var{n} items on the updated stack.
+If @var{n} is positive,
+then the rotation direction will make the topmost
+element the second-from top;
+if @var{n} is negative,
+then the rotation will make the topmost element the
+@var{n}-th element from the top.
+If the stack depth is less than @var{n}
+then the entire stack is rotated (in the appropriate direction),
+without any error being reported.
+(This command is a @sc{gnu} extension.)
 @end table
 
 @node Registers, Parameters, Stack Control, Top
 @chapter Registers
 
-@sc{dc} provides at least 256 memory registers,
+@command{dc} provides at least 256 memory registers@footnote{The
+exact number of registers provided by @command{dc} depends
+on the range of an @code{unsigned char} in the C compiler
+used to create the @command{dc} executable.},
 each named by a single character.
 You can store a number in a register and retrieve it later.
 
@@ -313,6 +325,8 @@ store it into register @var{r}.
 @item l@var{r}
 Copy the value in register @var{r},
 and push it onto the stack.
+The value @code{0} is retrieved if the
+register is uninitialized or its stack has become empty.
 This does not alter the contents of @var{r}.
 
 Each register also contains its own stack.
@@ -338,7 +352,7 @@ is now accessible via the @samp{l@var{r}} command.
 @node Parameters, Strings, Registers, Top
 @chapter Parameters
 
-@sc{dc} has three parameters that control its operation:
+@command{dc} has three parameters that control its operation:
 the precision, the input radix, and the output radix.
 The precision specifies the number of fraction digits
 to keep in the result of most arithmetic operations.
@@ -381,12 +395,15 @@ Pushes the current precision on the stack.
 @node Strings, Status Inquiry, Parameters, Top
 @chapter Strings
 
-@sc{dc} can operate on strings as well as on numbers.
-The only things you can do with strings are print them
+@command{dc} has a limited ability
+to operate on strings as well as on numbers;
+the only things you can do with strings are print them
 and execute them as macros
-(which means that the contents of the string are processed as @sc{dc} commands).
+(which means that the contents of the string are processed
+as @command{dc} commands).
 Both registers and the stack can hold strings,
-and @sc{dc} always knows whether any given object is a string or a number.
+and @command{dc} always knows whether any given object is
+a string or a number.
 Some commands such as arithmetic operations demand numbers
 as arguments and print errors if given strings.
 Other commands can accept either a number or a string;
@@ -398,15 +415,18 @@ according to its type.
 Makes a string containing @var{characters} and pushes it on the stack.
 For example, @samp{[foo]P} prints the characters @samp{foo}
 (with no newline).
+Note that all square brackets (@samp{[}s and @samp{]}s) must be balanced;
+there is no mechanism provided for handling unbalanced square brackets.
 
 @item a
 The mnemonic for this is somewhat erroneous: asciify.
 The top-of-stack is popped.
 If it was a number, then the low-order byte of this number
-is converted into a string and pushed onto the stack.
+is converted into a 1-character string
+and pushed onto the stack.
 Otherwise the top-of-stack was a string,
 and the first character of that string is pushed back.
-(This command is a GNU extension.)
+(This command is a @sc{gnu} extension.)
 
 @item x
 Pops a value off the stack and executes it as a macro.
@@ -455,7 +475,7 @@ During the execution of a macro,
 this command exits from the macro and also from the macro which invoked it.
 If called from the top level,
 or from a macro which was called directly from the top level,
-the @samp{q} command will cause @sc{dc} to exit.
+the @samp{q} command will cause @command{dc} to exit.
 
 @item Q
 Pops a value off the stack and uses it as a count
@@ -469,9 +489,19 @@ Thus, @samp{3Q} exits three levels.
 @table @samp
 @item Z
 Pops a value off the stack,
-calculates the number of digits it has
+calculates the number of decimal digits it has
 (or number of characters, if it is a string)
 and pushes that number.
+
+Note that the digit count for a number does
+@emph{not} include any leading zeros,
+even if those appear to the right of the radix point.
+This may seem a bit strange at first,
+but it is compatible with historical implementations of @command{dc},
+and can be argued to be useful for computing the magnitude of a value:
+@code{dSaXLaZ-} will compute the power-of-ten multiplier
+which would be needed to shift the decimal point
+to be immediately before the leftmost non-zero digit.
 
 @item X
 Pops a value off the stack,
@@ -493,13 +523,13 @@ before the execution of the @samp{z} command.
 @table @samp
 @item !
 Will run the rest of the line as a system command.
-Note that parsing of the !<, !=, and !> commands take precidence,
+Note that parsing of the !<, !=, and !> commands take precedence,
 so if you want to run a command starting with <, =, or > you will
 need to add a space after the !.
 
 @item #
 Will interpret the rest of the line as a comment.
-(This command is a GNU extension.)
+(This command is a @sc{gnu} extension.)
 
 @item :@var{r}
 Will pop the top two values off of the stack.

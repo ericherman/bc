@@ -1,11 +1,10 @@
-/* execute.c - run a bc program. */
-
 /*  This file is part of GNU bc.
-    Copyright (C) 1991-1994, 1997, 2000 Free Software Foundation, Inc.
+
+    Copyright (C) 1991-1994, 1997, 2006, 2008, 2012-2017 Free Software Foundation, Inc.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License , or
+    the Free Software Foundation; either version 3 of the License , or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
@@ -14,10 +13,8 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program; see the file COPYING.  If not, write to
-      The Free Software Foundation, Inc.
-      59 Temple Place, Suite 330
-      Boston, MA 02111 USA
+    along with this program; see the file COPYING.  If not, see
+    <http://www.gnu.org/licenses>.
 
     You may contact the author by:
        e-mail:  philnelson@acm.org
@@ -27,10 +24,10 @@
                 Bellingham, WA 98226-9062
        
 *************************************************************************/
+/* execute.c - run a bc program. */
 
 #include "bcdefs.h"
 #include <signal.h>
-#include "global.h"
 #include "proto.h"
 
 
@@ -39,38 +36,34 @@
 int had_sigint;
 
 void
-stop_execution (sig)
-     int sig;
+stop_execution ( int sig )
 {
   had_sigint = TRUE;
-  printf ("\n");
-  rt_error ("interrupted execution");
 }
 
 
 /* Get the current byte and advance the PC counter. */
 
 unsigned char
-byte (pc)
-     program_counter *pc;
+byte ( program_counter *p )
 {
-  return (functions[pc->pc_func].f_body[pc->pc_addr++]);
+  return (functions[p->pc_func].f_body[p->pc_addr++]);
 }
 
 
 /* The routine that actually runs the machine. */
 
 void
-execute ()
+execute (void)
 {
-  int label_num, l_gp, l_off;
+  unsigned long label_num, l_gp, l_off;
   bc_label_group *gp;
   
   char inst, ch;
-  int  new_func;
-  int  var_name;
+  long  new_func;
+  long  var_name;
 
-  int const_base;
+  long const_base;
 
   bc_num temp_num;
   arg_list *auto_list;
@@ -85,10 +78,11 @@ execute ()
   if (interactive)
     {
       signal (SIGINT, stop_execution);
-      had_sigint = FALSE;
     }
    
-  while (pc.pc_addr < functions[pc.pc_func].f_code_size && !runtime_error)
+  had_sigint = FALSE;
+  while (pc.pc_addr < functions[pc.pc_func].f_code_size
+	 && !runtime_error && !had_sigint)
     {
       inst = byte(&pc);
 
@@ -127,6 +121,7 @@ execute ()
       case 'Z' : /* Branch to a label if TOS == 0. Remove value on TOS. */
 	c_code = !bc_is_zero (ex_stack->s_num);
 	pop ();
+	/*FALLTHROUGH*/ /* common branch and jump code */
       case 'J' : /* Jump to a label. */
 	label_num = byte(&pc);  /* Low order bits first. */
 	label_num += byte(&pc) << 8;
@@ -136,7 +131,12 @@ execute ()
 	  l_gp  = label_num >> BC_LABEL_LOG;
 	  l_off = label_num % BC_LABEL_GROUP;
 	  while (l_gp-- > 0) gp = gp->l_next;
-	  pc.pc_addr = gp->l_adrs[l_off];
+          if (gp)
+            pc.pc_addr = gp->l_adrs[l_off];
+          else {
+            rt_error ("Internal error.");
+            break;
+          }
 	}
 	break;
 
@@ -290,6 +290,11 @@ execute ()
 	case 'I': /* Read function. */
 	  push_constant (input_char, i_base);
 	  break;
+
+	case 'X': /* Random function. */
+	  push_copy (_zero_);
+	  bc_int2num (&ex_stack->s_num, random());
+	  break;
 	}
 	break;
 
@@ -301,7 +306,9 @@ execute ()
 	break;
       
       case 'h' : /* Halt the machine. */
-	exit (0);
+	bc_exit (0);
+        /* NOTREACHED */
+        break;
 
       case 'i' : /* increment number */
 	var_name = byte(&pc);
@@ -349,7 +356,7 @@ execute ()
 	push_copy (_zero_);
 	break;
 
-      case '1' : /* Load Constant 0. */
+      case '1' : /* Load Constant 1. */
 	push_copy (_one_);
 	break;
 
@@ -542,7 +549,7 @@ execute ()
     {
       signal (SIGINT, use_quit);
       if (had_sigint)
-	printf ("Interruption completed.\n");
+	printf ("\ninterrupted execution.\n");
     }
 }
 
@@ -550,20 +557,20 @@ execute ()
 /* Prog_char gets another byte from the program.  It is used for
    conversion of text constants in the code to numbers. */
 
-char
-prog_char ()
+int
+prog_char (void)
 {
-  return byte(&pc);
+  return (int) byte(&pc);
 }
 
 
 /* Read a character from the standard input.  This function is used
    by the "read" function. */
 
-char
-input_char ()
+int
+input_char (void)
 {
-  char in_ch;
+  int in_ch;
   
   /* Get a character from the standard input for the read function. */
   in_ch = getchar();
@@ -572,12 +579,14 @@ input_char ()
   if (in_ch == '\\')
     {
       in_ch = getchar();
-      if (in_ch == '\n')
-	in_ch = getchar();
+      if (in_ch == '\n') {
+	  in_ch = getchar();
+	  out_col = 0;  /* Saw a new line */
+	}
     }
 
   /* Classify and preprocess the input character. */
-  if (isdigit((int)in_ch))
+  if (isdigit(in_ch))
     return (in_ch - '0');
   if (in_ch >= 'A' && in_ch <= 'F')
     return (in_ch + 10 - 'A');
@@ -597,13 +606,11 @@ input_char ()
    stack.  The number is converted as a number in base CONV_BASE. */
 
 void
-push_constant (in_char, conv_base)
-   char (*in_char)(VOID);
-   int conv_base;
+push_constant (int (*in_char)(VOID), int conv_base)
 {
   int digits;
   bc_num build, temp, result, mult, divisor;
-  char  in_ch, first_ch;
+  int   in_ch, first_ch;
   char  negative;
 
   /* Initialize all bc numbers */
@@ -631,19 +638,19 @@ push_constant (in_char, conv_base)
       }
 
   /* Check for the special case of a single digit. */
-  if (in_ch < 16)
+  if (in_ch < 36)
     {
       first_ch = in_ch;
       in_ch = in_char();
-      if (in_ch < 16 && first_ch >= conv_base)
+      if (in_ch < 36 && first_ch >= conv_base)
 	first_ch = conv_base - 1;
       bc_int2num (&build, (int) first_ch);
     }
 
   /* Convert the integer part. */
-  while (in_ch < 16)
+  while (in_ch < 36)
     {
-      if (in_ch < 16 && in_ch >= conv_base) in_ch = conv_base-1;
+      if (in_ch < 36 && in_ch >= conv_base) in_ch = conv_base-1;
       bc_multiply (build, mult, &result, 0);
       bc_int2num (&temp, (int) in_ch);
       bc_add (result, temp, &build, 0);
@@ -658,7 +665,7 @@ push_constant (in_char, conv_base)
       divisor = bc_copy_num (_one_);
       result = bc_copy_num (_zero_);
       digits = 0;
-      while (in_ch < 16)
+      while (in_ch < 36)
 	{
 	  bc_multiply (result, mult, &result, 0);
 	  bc_int2num (&temp, (int) in_ch);
@@ -666,7 +673,7 @@ push_constant (in_char, conv_base)
 	  bc_multiply (divisor, mult, &divisor, 0);
 	  digits++;
 	  in_ch = in_char();
-	  if (in_ch < 16 && in_ch >= conv_base) in_ch = conv_base-1;
+	  if (in_ch < 36 && in_ch >= conv_base) in_ch = conv_base-1;
 	}
       bc_divide (result, divisor, &result, digits);
       bc_add (build, result, &build, 0);
@@ -689,17 +696,16 @@ push_constant (in_char, conv_base)
    the constant. */
 
 void
-push_b10_const (pc)
-     program_counter *pc;
+push_b10_const (program_counter *progctr)
 {
   bc_num build;
   program_counter look_pc;
   int kdigits, kscale;
-  char inchar;
+  unsigned char inchar;
   char *ptr;
   
   /* Count the digits and get things ready. */
-  look_pc = *pc;
+  look_pc = *progctr;
   kdigits = 0;
   kscale  = 0;
   inchar = byte (&look_pc);
@@ -718,8 +724,8 @@ push_b10_const (pc)
 	}
     }
 
-  /* Get the first character again and move the pc. */
-  inchar = byte(pc);
+  /* Get the first character again and move the progctr. */
+  inchar = byte(progctr);
   
   /* Secial cases of 0, 1, and A-F single inputs. */
   if (kdigits == 1 && kscale == 0)
@@ -727,12 +733,12 @@ push_b10_const (pc)
       if (inchar == 0)
 	{
 	  push_copy (_zero_);
-	  inchar = byte(pc);
+	  inchar = byte(progctr);
 	  return;
 	}
       if (inchar == 1) {
       push_copy (_one_);
-      inchar = byte(pc);
+      inchar = byte(progctr);
       return;
     }
     if (inchar > 9)
@@ -740,7 +746,7 @@ push_b10_const (pc)
 	bc_init_num (&build);
 	bc_int2num (&build, inchar);
 	push_num (build);
-	inchar = byte(pc);
+	inchar = byte(progctr);
 	return;
       }
     }
@@ -767,7 +773,7 @@ push_b10_const (pc)
 	  else
 	    *ptr++ = inchar;
 	}
-      inchar = byte(pc);
+      inchar = byte(progctr);
     }
   push_num (build);
 }
@@ -776,13 +782,11 @@ push_b10_const (pc)
 /* Put the correct value on the stack for C_CODE.  Frees TOS num. */
 
 void
-assign (c_code)
-     char c_code;
+assign (char code)
 {
   bc_free_num (&ex_stack->s_num);
-  if (c_code)
+  if (code)
     ex_stack->s_num = bc_copy_num (_one_);
   else
     ex_stack->s_num = bc_copy_num (_zero_);
 }
-

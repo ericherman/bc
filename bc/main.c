@@ -1,11 +1,10 @@
-/* main.c: The main program for bc.  */
-
 /*  This file is part of GNU bc.
-    Copyright (C) 1991-1994, 1997, 1998, 2000 Free Software Foundation, Inc.
+
+    Copyright (C) 1991-1994, 1997, 2006, 2008, 2012-2017 Free Software Foundation, Inc.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License , or
+    the Free Software Foundation; either version 3 of the License , or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
@@ -14,10 +13,8 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program; see the file COPYING.  If not, write to
-      The Free Software Foundation, Inc.
-      59 Temple Place, Suite 330
-      Boston, MA 02111 USA
+    along with this program; see the file COPYING.  If not, see
+    <http://www.gnu.org/licenses>.
 
     You may contact the author by:
        e-mail:  philnelson@acm.org
@@ -28,9 +25,11 @@
        
 *************************************************************************/
 
+/* main.c: The main program for bc.  */
+
 #include "bcdefs.h"
 #include <signal.h>
-#include "global.h"
+#include <errno.h>
 #include "proto.h"
 #include "getopt.h"
 
@@ -41,29 +40,36 @@ static char first_file;
 /* Points to the last node in the file name list for easy adding. */
 static file_node *last = NULL;
 
+#if defined(LIBEDIT)
+/* The prompt for libedit. */
+char el_pmtchars[] = "";
+static char *el_pmtfunc(void);
+static char *el_pmtfunc(void) { return el_pmtchars; }
+#endif
+
 /* long option support */
 static struct option long_options[] =
 {
-  {"compile",  0, &compile_only, TRUE},
-  {"help",     0, 0,             'h'},
-  {"interactive", 0, 0,          'i'},
-  {"mathlib",  0, &use_math,     TRUE},
-  {"quiet",    0, &quiet,        TRUE},
-  {"standard", 0, &std_only,     TRUE},
-  {"version",  0, 0,             'v'},
-  {"warn",     0, &warn_not_std, TRUE},
+  {"compile",     0, &compile_only, TRUE},
+  {"help",        0, 0,             'h'},
+  {"interactive", 0, 0,             'i'},
+  {"mathlib",     0, &use_math,     TRUE},
+  {"quiet",       0, &quiet,        TRUE},
+  {"standard",    0, &std_only,     TRUE},
+  {"version",     0, 0,             'v'},
+  {"warn",        0, &warn_not_std, TRUE},
 
   {0, 0, 0, 0}
 };
 
 
-void
-usage (char *progname)
+static void
+usage (const char *progname)
 {
   printf ("usage: %s [options] [file ...]\n%s%s%s%s%s%s%s", progname,
           "  -h  --help         print this usage and exit\n",
 	  "  -i  --interactive  force interactive mode\n",
-	  "  -l  --mathlib      use the predefine math routnes\n",
+	  "  -l  --mathlib      use the predefined math routines\n",
 	  "  -q  --quiet        don't print initial banner\n",
 	  "  -s  --standard     non-standard bc constructs are errors\n",
 	  "  -w  --warn         warn about non-standard bc constructs\n",
@@ -71,10 +77,8 @@ usage (char *progname)
 }
 
 
-void
-parse_args (argc, argv)
-     int argc;
-     char **argv;
+static void
+parse_args (int argc, char **argv)
 {
   int optch;
   int long_index;
@@ -93,13 +97,16 @@ parse_args (argc, argv)
 
       switch (optch)
 	{
+	case 0: /* Long option setting a var. */
+	  break;
+
 	case 'c':  /* compile only */
 	  compile_only = TRUE;
 	  break;
 
 	case 'h':  /* help */
 	  usage(argv[0]);
-	  exit (0);
+	  bc_exit (0);
 	  break;
 
 	case 'i':  /* force interactive */
@@ -120,7 +127,7 @@ parse_args (argc, argv)
 
 	case 'v':  /* Print the version. */
 	  show_bc_version ();
-	  exit (0);
+	  bc_exit (0);
 	  break;
 
 	case 'w':  /* Non standard features give warnings. */
@@ -129,14 +136,18 @@ parse_args (argc, argv)
 
 	default:
 	  usage(argv[0]);
-	  exit (1);
+	  bc_exit (1);
 	}
     }
+
+#ifdef QUIET
+  quiet = TRUE;
+#endif
 
   /* Add file names to a list of files to process. */
   while (optind < argc)
     {
-      temp = (file_node *) bc_malloc(sizeof(file_node));
+      temp = bc_malloc(sizeof(file_node));
       temp->name = argv[optind];
       temp->next = NULL;
       if (last == NULL)
@@ -150,25 +161,15 @@ parse_args (argc, argv)
 
 /* The main program for bc. */
 int
-main (argc, argv)
-     int argc;
-     char *argv[];
+main (int argc, char **argv)
 {
   char *env_value;
   char *env_argv[30];
   int   env_argc;
   
-  /* Initialize many variables. */
-  compile_only = FALSE;
-  use_math = FALSE;
-  warn_not_std = FALSE;
-  std_only = FALSE;
+  /* Interactive? */
   if (isatty(0) && isatty(1)) 
     interactive = TRUE;
-  else
-    interactive = FALSE;
-  quiet = FALSE;
-  file_names = NULL;
 
 #ifdef HAVE_SETVBUF
   /* attempt to simplify interaction with applications such as emacs */
@@ -180,7 +181,7 @@ main (argc, argv)
   if (env_value != NULL)
     {
       env_argc = 1;
-      env_argv[0] = "BC_ENV_ARGS";
+      env_argv[0] = strdup("BC_ENV_ARGS");
       while (*env_value != 0)
 	{
 	  if (*env_value != ' ')
@@ -211,7 +212,7 @@ main (argc, argv)
   if (env_value != NULL)
     {
       line_size = atoi (env_value);
-      if (line_size < 2)
+      if (line_size < 3 && line_size != 0)
 	line_size = 70;
     }
   else
@@ -231,7 +232,7 @@ main (argc, argv)
   is_std_in = FALSE;
   first_file = TRUE;
   if (!open_new_file ())
-    exit (1);
+    bc_exit (1);
 
 #if defined(LIBEDIT)
   if (interactive) {
@@ -240,7 +241,7 @@ main (argc, argv)
     hist = history_init();
     el_set (edit, EL_EDITOR, "emacs");
     el_set (edit, EL_HIST, history, hist);
-    el_set (edit, EL_PROMPT, null_prompt);
+    el_set (edit, EL_PROMPT, el_pmtfunc);
     el_source (edit, NULL);
     history (hist, &histev, H_SETSIZE, INT_MAX);
   }
@@ -262,7 +263,8 @@ main (argc, argv)
   if (compile_only)
     printf ("\n");
 
-  exit (0);
+  bc_exit (0);
+  return 0; // to keep the compiler from complaining
 }
 
 
@@ -271,7 +273,7 @@ main (argc, argv)
    it returns FALSE. */
 
 int
-open_new_file ()
+open_new_file (void)
 {
   FILE *new_file;
   file_node *temp;
@@ -286,18 +288,17 @@ open_new_file ()
   if (use_math && first_file)
     {
       /* Load the code from a precompiled version of the math libarary. */
-      extern char *libmath[];
-      char **mstr;
-      char tmp;
+      CONST char **mstr;
+
       /* These MUST be in the order of first mention of each function.
 	 That is why "a" comes before "c" even though "a" is defined after
 	 after "c".  "a" is used in "s"! */
-      tmp = lookup ("e", FUNCT);
-      tmp = lookup ("l", FUNCT);
-      tmp = lookup ("s", FUNCT);
-      tmp = lookup ("a", FUNCT);
-      tmp = lookup ("c", FUNCT);
-      tmp = lookup ("j", FUNCT);
+      (void) lookup (strdup("e"), FUNCT);
+      (void) lookup (strdup("l"), FUNCT);
+      (void) lookup (strdup("s"), FUNCT);
+      (void) lookup (strdup("a"), FUNCT);
+      (void) lookup (strdup("c"), FUNCT);
+      (void) lookup (strdup("j"), FUNCT);
       mstr = libmath;
       while (*mstr) {
            load_code (*mstr);
@@ -319,7 +320,7 @@ open_new_file ()
 	  return TRUE;
 	}
       fprintf (stderr, "File %s is unavailable.\n", file_names->name);
-      exit (1);
+      bc_exit (1);
     }
   
   /* If we fall through to here, we should return stdin. */
@@ -332,8 +333,7 @@ open_new_file ()
 /* Set yyin to the new file. */
 
 void
-new_yy_file (file)
-     FILE *file;
+new_yy_file (FILE *file)
 {
   if (!first_file) fclose (yyin);
   yyin = file;
@@ -344,9 +344,15 @@ new_yy_file (file)
 /* Message to use quit.  */
 
 void
-use_quit (sig)
-     int sig;
+use_quit (int sig)
 {
-  printf ("\n(interrupt) use quit to exit.\n");
+#ifdef DONTEXIT
+  int save = errno;
+  write (1, "\n(interrupt) use quit to exit.\n", 31);
   signal (SIGINT, use_quit);
+  errno = save;
+#else
+  write (1, "\n(interrupt) Exiting bc.\n", 26);
+  bc_exit(0);
+#endif
 }

@@ -1,11 +1,10 @@
-/* global.h:  The global variables for bc.  */
-
 /*  This file is part of GNU bc.
-    Copyright (C) 1991, 1992, 1993, 1994, 1997 Free Software Foundation, Inc.
+
+    Copyright (C) 1991-1994, 1997, 2006, 2008, 2012-2017 Free Software Foundation, Inc.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License , or
+    the Free Software Foundation; either version 3 of the License , or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
@@ -14,10 +13,8 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program; see the file COPYING.  If not, write to
-      The Free Software Foundation, Inc.
-      59 Temple Place, Suite 330
-      Boston, MA 02111 USA
+    along with this program; see the file COPYING.  If not, see
+    <http://www.gnu.org/licenses>.
 
     You may contact the author by:
        e-mail:  philnelson@acm.org
@@ -28,8 +25,9 @@
        
 *************************************************************************/
 
+/* global.h:  The global variables for bc.  */
 
-/* The current break level's lable. */
+/* The current break level's label. */
 EXTERN int break_label;
 
 /* The current if statement's else label or label after else. */
@@ -42,7 +40,8 @@ EXTERN int continue_label;
 EXTERN int next_label;
 
 /* Byte code character storage.  Used in many places for generation of code. */
-EXTERN char genstr[80];
+EXTERN char  *genstr  INIT(NULL);
+EXTERN int    genlen  INIT(0);
 
 /* Count of characters printed to the output in compile_only mode. */
 EXTERN int out_count;
@@ -52,25 +51,25 @@ EXTERN int out_count;
 EXTERN char did_gen;
 
 /* Is this run an interactive execution.  (Is stdin a terminal?) */
-EXTERN char interactive;
+EXTERN char interactive  INIT(FALSE);
 
 /* Just generate the byte code.  -c flag. */
-EXTERN int compile_only;
+EXTERN int compile_only INIT(FALSE);
 
 /* Load the standard math functions.  -l flag. */
-EXTERN int use_math;
+EXTERN int use_math  INIT(FALSE);
 
 /* Give a warning on use of any non-standard feature (non-POSIX).  -w flag. */
-EXTERN int warn_not_std;
+EXTERN int warn_not_std  INIT(FALSE);
 
 /* Accept POSIX bc only!  -s flag. */
-EXTERN int std_only;
+EXTERN int std_only  INIT(FALSE);
 
 /* Don't print the banner at start up.  -q flag. */
-EXTERN int quiet;
+EXTERN int quiet  INIT(FALSE);
 
 /* The list of file names to process. */
-EXTERN file_node *file_names;
+EXTERN file_node *file_names  INIT(NULL);
 
 /* The name of the current file being processed. */
 EXTERN char *file_name;
@@ -113,7 +112,7 @@ EXTERN int n_history;
 
 #if defined(LIBEDIT)
 /* LIBEDIT data */
-EditLine *edit;
+EditLine *edit INIT(NULL);
 History  *hist;
 HistEvent histev;
 #endif
@@ -152,3 +151,6 @@ extern int optind;
 
 /* Access to the yy input file.  Defined in scan.c. */
 extern FILE *yyin;
+
+/* Access to libmath */
+extern CONST char *libmath[];
